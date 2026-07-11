@@ -1,0 +1,414 @@
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <string>
+using namespace std;
+
+struct Jadwal {
+    string hari, kegiatan;
+    int jam, mins;
+    int prioritas; 
+};
+
+class JadwalHarian {
+private:
+    Jadwal data[32][10]; 
+    int jumlahPerTanggal[32] = {0}; 
+    int pilih;
+
+    void loadFile() {
+        ifstream file("Jadwal_Harian10.txt");
+        if (!file.is_open()) return;
+        
+        for (int i = 0; i < 32; i++) {
+            jumlahPerTanggal[i] = 0;
+        }
+
+        string baris;
+        while (getline(file, baris)) {
+            if (baris.empty()) continue;
+
+            size_t dotPos = baris.find(". ");
+            if (dotPos == string::npos) continue;
+            
+            int tgl = stoi(baris.substr(0, dotPos));
+            if (tgl < 1 || tgl > 31) continue;
+
+            string sisa = baris.substr(dotPos + 2); 
+
+            size_t pipePos = sisa.find(" | ");
+            if (pipePos == string::npos) continue;
+            
+            int kolom = jumlahPerTanggal[tgl];
+            if (kolom >= 10) continue; 
+
+            data[tgl][kolom].hari = sisa.substr(0, pipePos);
+
+            size_t jamPos = sisa.find("| Jam ");
+            if (jamPos == string::npos) continue;
+            string jamBagian = sisa.substr(jamPos + 6); 
+
+            size_t colonPos = jamBagian.find(":");
+            if (colonPos == string::npos) continue;
+            data[tgl][kolom].jam = stoi(jamBagian.substr(0, colonPos));
+
+            string setelahColon = jamBagian.substr(colonPos + 1); 
+            size_t prioPipePos = setelahColon.find(" | Prio ");
+            if (prioPipePos == string::npos) continue;
+            data[tgl][kolom].mins = stoi(setelahColon.substr(0, prioPipePos));
+
+            string prioBagian = setelahColon.substr(prioPipePos + 8);
+            size_t dashPos = prioBagian.find(" - ");
+            if (dashPos == string::npos) continue;
+            data[tgl][kolom].prioritas = stoi(prioBagian.substr(0, dashPos));
+            data[tgl][kolom].kegiatan = prioBagian.substr(dashPos + 3);
+
+            jumlahPerTanggal[tgl]++; 
+        }
+        file.close();
+    }
+
+    void simpanFile() {
+        ofstream file("Jadwal_Harian10.txt");
+        if (!file.is_open()) {
+            cout << "File gagal dibuka!\n";
+            return;
+        }
+        
+        for (int tgl = 1; tgl <= 31; tgl++) {
+            for (int i = 0; i < jumlahPerTanggal[tgl]; i++) {
+                file << tgl << ". " 
+                     << data[tgl][i].hari << " | Jam "
+                     << setfill('0') << setw(2) << data[tgl][i].jam << ":"
+                     << setw(2) << data[tgl][i].mins << " | Prio "
+                     << data[tgl][i].prioritas << " - "
+                     << data[tgl][i].kegiatan << "\n";
+            }
+        }
+        file.close();
+    }
+
+    void cariJadwalIteratif(string hariCari) {
+        cout << "\n[ITERATIF] Hasil pencarian jadwal hari \"" << hariCari << "\":\n";
+        cout << "---------------------------------------------------\n";
+
+        bool ditemukan = false;
+        int nomorUrut = 1;
+
+        for (int tgl = 1; tgl <= 31; tgl++) {
+            for (int i = 0; i < jumlahPerTanggal[tgl]; i++) {
+                if (data[tgl][i].hari == hariCari) {
+                    string txtPrio = (data[tgl][i].prioritas == 1) ? "Tinggi" : (data[tgl][i].prioritas == 2 ? "Sedang" : "Rendah");
+                    cout << nomorUrut++ << ". [Tanggal " << tgl << "] "
+                         << setfill(' ') << data[tgl][i].hari << " | Jam "
+                         << setfill('0') << setw(2) << data[tgl][i].jam << ":"
+                         << setw(2) << data[tgl][i].mins << " | Prio: " << txtPrio << " - "
+                         << data[tgl][i].kegiatan << endl;
+                    ditemukan = true;
+                }
+            }
+        }
+
+        if (!ditemukan) {
+            cout << "Tidak ada jadwal untuk hari \"" << hariCari << "\".\n";
+        }
+        cout << endl;
+    }
+
+    int hitungJadwalRekursif(int tgl, int kolom, string hariCari, int total = 0) {
+        if (tgl > 31) return total; 
+        
+        if (kolom >= jumlahPerTanggal[tgl]) {
+            return hitungJadwalRekursif(tgl + 1, 0, hariCari, total);
+        }
+        
+        if (data[tgl][kolom].hari == hariCari) total++;
+        
+        return hitungJadwalRekursif(tgl, kolom + 1, hariCari, total);
+    }
+
+    void tampilJadwalTerbalikRekursif(int tgl, int kolom) {
+        if (tgl < 1) return; 
+        
+        if (kolom < 0) {
+            if (tgl - 1 >= 1) {
+                tampilJadwalTerbalikRekursif(tgl - 1, jumlahPerTanggal[tgl - 1] - 1);
+            }
+            return;
+        }
+
+        string txtPrio = (data[tgl][kolom].prioritas == 1) ? "Tinggi" : (data[tgl][kolom].prioritas == 2 ? "Sedang" : "Rendah");
+        cout << "[Tanggal " << tgl << "] "
+             << setfill(' ') << data[tgl][kolom].hari << " | Jam "
+             << setfill('0') << setw(2) << data[tgl][kolom].jam << ":"
+             << setw(2) << data[tgl][kolom].mins << " | Prio: " << txtPrio << " - "
+             << data[tgl][kolom].kegiatan << endl;
+             
+        tampilJadwalTerbalikRekursif(tgl, kolom - 1);
+    }
+
+    void urutkanJadwalBerdasarkanWaktu() {
+        bool adaPerubahan = false;
+        
+        for (int tgl = 1; tgl <= 31; tgl++) {
+            int n = jumlahPerTanggal[tgl];
+            
+            if (n > 1) {
+                for (int i = 0; i < n - 1; i++) {
+                    for (int j = 0; j < n - i - 1; j++) {
+                        if (data[tgl][j].jam > data[tgl][j+1].jam || 
+                           (data[tgl][j].jam == data[tgl][j+1].jam && data[tgl][j].mins > data[tgl][j+1].mins)) {
+                            
+                            Jadwal temp = data[tgl][j];
+                            data[tgl][j] = data[tgl][j+1];
+                            data[tgl][j+1] = temp;
+                            
+                            adaPerubahan = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (adaPerubahan) {
+            simpanFile(); 
+            cout << "Berhasil! Jadwal telah diurutkan berdasarkan waktu (pagi ke malam).\n\n";
+        } else {
+            cout << "Jadwal sudah terurut atau data terlalu sedikit untuk diurutkan.\n\n";
+        }
+    }
+
+public:
+    void display() {
+        loadFile();
+        do {
+            cout << "=======================================================\n";
+            cout << "                     JADWAL HARIAN\n";
+            cout << "=======================================================\n";
+            cout << "Menu\n";
+            cout << "1. Tambahkan jadwal\n";
+            cout << "2. Lihat jadwal\n";
+            cout << "3. Cari jadwal per hari   (ITERATIF)\n";
+            cout << "4. Hitung jadwal per hari (REKURSIF)\n";
+            cout << "5. Lihat jadwal terbalik  (REKURSIF)\n";
+            cout << "6. Urutkan jadwal (Waktu) (BUBBLE SORT)\n";
+            cout << "7. Edit/Ganti jadwal      (POINTER)\n";
+            cout << "8. Hapus jadwal           (SHIFTING ARRAY)\n"; // MENU BARU
+            cout << "9. Keluar\n";
+            cout << "Pilih no: "; cin >> pilih;
+            cout << endl;
+
+            switch (pilih) {
+                case 1: {
+                    int tglInput;
+                    cout << "Masukan tanggal (1-31): "; cin >> tglInput;
+                    if (tglInput < 1 || tglInput > 31) {
+                        cout << "Tanggal tidak valid!\n\n";
+                        continue;
+                    }
+                    
+                    int slot = jumlahPerTanggal[tglInput];
+                    if (slot >= 10) {
+                        cout << "Jadwal untuk tanggal " << tglInput << " sudah penuh (Maks 10)!\n\n";
+                        continue;
+                    }
+
+                    cin.ignore();
+                    cout << "Masukan hari: ";
+                    getline(cin, data[tglInput][slot].hari);
+                    cout << "Masukan jam: "; cin >> data[tglInput][slot].jam;
+                    cout << "Masukan menit: "; cin >> data[tglInput][slot].mins;
+                    cout << "Masukan prioritas (1=Tinggi, 2=Sedang, 3=Rendah): "; cin >> data[tglInput][slot].prioritas;
+                    cin.ignore();
+                    cout << "Masukan kegiatan: ";
+                    getline(cin, data[tglInput][slot].kegiatan);
+                    
+                    jumlahPerTanggal[tglInput]++;
+                    simpanFile();
+                    cout << "\nJadwal berhasil disimpan untuk tanggal " << tglInput << "!\n\n";
+                    break;
+                }
+                
+                case 2: {
+                    cout << "===== DAFTAR JADWAL =====\n";
+                    bool adaJadwal = false;
+                    
+                    for (int tgl = 1; tgl <= 31; tgl++) {
+                        for (int i = 0; i < jumlahPerTanggal[tgl]; i++) {
+                            adaJadwal = true;
+                            string txtPrio = (data[tgl][i].prioritas == 1) ? "Tinggi" : (data[tgl][i].prioritas == 2 ? "Sedang" : "Rendah");
+                            cout << "[Tanggal " << tgl << "] " 
+                                 << setfill(' ') << data[tgl][i].hari << " | "
+                                 << "Jam " << setfill('0') << setw(2) << data[tgl][i].jam << ":"
+                                 << setw(2) << data[tgl][i].mins << " | Prio: " << txtPrio << " - "
+                                 << data[tgl][i].kegiatan << endl;
+                        }
+                    }
+                    if (!adaJadwal) cout << "Belum ada jadwal >_<\n";
+                    cout << endl;
+                    break;
+                }
+                
+                case 3: {
+                    cin.ignore();
+                    string hariCari;
+                    cout << "Masukan hari yang dicari: ";
+                    getline(cin, hariCari);
+                    cariJadwalIteratif(hariCari);
+                    break;
+                }
+                
+                case 4: {
+                    cin.ignore();
+                    string hariCari;
+                    cout << "Masukan hari yang ingin dihitung: ";
+                    getline(cin, hariCari);
+                    
+                    int total = hitungJadwalRekursif(1, 0, hariCari, 0);
+                    cout << "\n[REKURSIF] Jumlah jadwal hari \"" << hariCari
+                         << "\": " << total << " kegiatan\n\n";
+                    break;
+                }
+                
+                case 5: {
+                    cout << "===== JADWAL TERBALIK (Tanggal 31 -> 1) =====\n";
+                    bool adaJadwal = false;
+                    for (int i = 1; i <= 31; i++) {
+                        if (jumlahPerTanggal[i] > 0) adaJadwal = true;
+                    }
+
+                    if (!adaJadwal) {
+                        cout << "Belum ada jadwal >_<\n";
+                    } else {
+                        tampilJadwalTerbalikRekursif(31, jumlahPerTanggal[31] - 1);
+                    }
+                    cout << endl;
+                    break;
+                }
+                
+                case 6: {
+                    urutkanJadwalBerdasarkanWaktu();
+                    break;
+                }
+
+                case 7: {
+                    int tglEdit;
+                    cout << "Masukan tanggal jadwal yang ingin diedit (1-31): "; cin >> tglEdit;
+                    if (tglEdit < 1 || tglEdit > 31) {
+                        cout << "Tanggal tidak valid!\n\n";
+                        continue;
+                    }
+                    if (jumlahPerTanggal[tglEdit] == 0) {
+                        cout << "Tidak ada jadwal pada tanggal " << tglEdit << "!\n\n";
+                        continue;
+                    }
+
+                    cout << "\nJadwal pada tanggal " << tglEdit << ":\n";
+                    for (int i = 0; i < jumlahPerTanggal[tglEdit]; i++) {
+                        cout << i + 1 << ". [" << data[tglEdit][i].hari << "] Jam " 
+                             << data[tglEdit][i].jam << ":" << data[tglEdit][i].mins 
+                             << " - " << data[tglEdit][i].kegiatan << "\n";
+                    }
+
+                    int nomorPilih;
+                    cout << "Pilih nomor urut jadwal yang ingin diubah (Ketik 0 untuk batal): "; cin >> nomorPilih;
+                    
+                    if (nomorPilih == 0) {
+                        cout << "Aksi dibatalkan.\n\n";
+                        break;
+                    }
+
+                    int idx = nomorPilih - 1;
+                    if (idx < 0 || idx >= jumlahPerTanggal[tglEdit]) {
+                        cout << "Nomor urut tidak valid!\n\n";
+                        break;
+                    }
+
+                    Jadwal* ptrJadwal = &data[tglEdit][idx];
+
+                    cin.ignore();
+                    cout << "Masukan hari baru: ";
+                    getline(cin, ptrJadwal->hari);
+                    cout << "Masukan jam baru: "; cin >> ptrJadwal->jam;
+                    cout << "Masukan menit baru: "; cin >> ptrJadwal->mins;
+                    cout << "Masukan prioritas baru (1=Tinggi, 2=Sedang, 3=Rendah): "; cin >> ptrJadwal->prioritas;
+                    cin.ignore();
+                    cout << "Masukan kegiatan baru: ";
+                    getline(cin, ptrJadwal->kegiatan);
+
+                    simpanFile();
+                    cout << "\nJadwal berhasil diperbarui menggunakan Pointer!\n\n";
+                    break;
+                }
+
+                // --- FITUR HAPUS JADWAL ---
+                case 8: {
+                    int tglHapus;
+                    cout << "Masukan tanggal jadwal yang ingin dihapus (1-31): "; cin >> tglHapus;
+                    
+                    if (tglHapus < 1 || tglHapus > 31) {
+                        cout << "Tanggal tidak valid!\n\n";
+                        continue;
+                    }
+                    if (jumlahPerTanggal[tglHapus] == 0) {
+                        cout << "Tidak ada jadwal pada tanggal " << tglHapus << "!\n\n";
+                        continue;
+                    }
+
+                    // Tampilkan list jadwal pada tanggal yang dipilih
+                    cout << "\nJadwal pada tanggal " << tglHapus << ":\n";
+                    for (int i = 0; i < jumlahPerTanggal[tglHapus]; i++) {
+                        cout << i + 1 << ". [" << data[tglHapus][i].hari << "] Jam " 
+                             << setfill('0') << setw(2) << data[tglHapus][i].jam << ":" 
+                             << setw(2) << data[tglHapus][i].mins 
+                             << " - " << data[tglHapus][i].kegiatan << "\n";
+                    }
+
+                    int nomorPilih;
+                    cout << "Pilih nomor urut jadwal yang ingin dihapus (Ketik 0 untuk batal): "; cin >> nomorPilih;
+                    
+                    if (nomorPilih == 0) {
+                        cout << "Penghapusan dibatalkan.\n\n";
+                        break;
+                    }
+
+                    int idx = nomorPilih - 1;
+                    if (idx < 0 || idx >= jumlahPerTanggal[tglHapus]) {
+                        cout << "Nomor urut tidak valid!\n\n";
+                        break;
+                    }
+
+                    // ALGORITMA SHIFTING (Menggeser Array ke Kiri)
+                    for (int i = idx; i < jumlahPerTanggal[tglHapus] - 1; i++) {
+                        data[tglHapus][i] = data[tglHapus][i + 1];
+                    }
+
+                    // Kurangi total data pada tanggal tersebut
+                    jumlahPerTanggal[tglHapus]--;
+                    
+                    // Simpan ulang ke dalam file .txt
+                    simpanFile();
+                    cout << "\nJadwal berhasil dihapus!\n\n";
+                    break;
+                }
+                
+                case 9: {
+                    cout << "Jangan lupa liat jadwal ya!\n";
+                    break;
+                }
+                
+                default: {
+                    cout << "Pilihan tidak valid!\n";
+                    break;
+                }
+            }
+
+        } while (pilih != 9);
+    }
+};
+
+int main() {
+    JadwalHarian jh;
+    jh.display();
+    return 0;
+}
